@@ -14,15 +14,18 @@ const firebaseConfig = {
     measurementId: "G-ZSTR56D0PW"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const functions = getFunctions(app, 'asia-northeast3'); // functions 리전 설정 (Firebase 프로젝트 설정과 동일하게)
 
-// Firebase Functions 호출 함수
+const db = getFirestore(app);
+// --- 👇 리전 지정 제거 👇 ---
+const functions = getFunctions(app); // 리전 지정('asia-northeast3') 제거
+// --- 👆 리전 지정 제거 👆 ---
+
+// Firebase Functions 호출 함수 정의
 const findRecipesFunction = httpsCallable(functions, 'findRecipes');
 
+// --- 로그는 유지 ---
 console.log('[firebaseconfig.js] 정의된 findRecipesFunction:', findRecipesFunction);
 console.log('[firebaseconfig.js] typeof findRecipesFunction:', typeof findRecipesFunction);
 
-export { db, findRecipesFunction };
+export { db, findRecipesFunction }; // db도 함께 export 하는 것이 좋습니다.

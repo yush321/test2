@@ -15,7 +15,7 @@ module.exports = {
     "prefer-arrow-callback": "error",
     "quotes": ["error", "double", {"allowTemplateLiterals": true}],
     "linebreak-style": "off",
-    "max-len": ["warn", {"code": 130, "ignoreUrls": true, "ignoreStrings": true, "ignoreTemplateLiterals": true}],
+    "max-len": ["warn", {"code": 150, "ignoreUrls": true, "ignoreStrings": true, "ignoreTemplateLiterals": true}],
 
   },
   overrides: [

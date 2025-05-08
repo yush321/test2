@@ -16,6 +16,9 @@ function App() {
   const [currentSearchIngredients, setCurrentSearchIngredients] = useState([]);
 
   const handleSearchRecipes = useCallback(async (ingredients) => {
+
+    console.log('[App.js] handleSearchRecipes 호출됨, 전달받은 재료:', ingredients);
+    
     if (ingredients.length === 0) {
       // setRecipes([]); // 재료가 없으면 기존 목록을 비우거나, 인기 레시피 등을 요청
       // return;
@@ -25,6 +28,7 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
+      console.log('[App.js] findRecipesFunction 호출 직전 ingredients 값:', ingredients); 
       const result = await findRecipesFunction({ userIngredients: ingredients });
       // Firebase Functions는 result.data에 실제 응답을 담아 보냅니다.
       setRecipes(result.data || []);
