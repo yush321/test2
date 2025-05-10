@@ -1,4 +1,4 @@
-// functions/index.js (ESLint 오류 수정)
+// functions/index.js (ESLint 오류 최종 수정)
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
@@ -35,9 +35,11 @@ function checkRecipeMatch(recipeIngredientCount, userIngredientCount, matchCount
   } else if (recipeIngredientCount === 4) {
     return userIngredientCount >= 3 && matchCount >= 3;
   } else if (recipeIngredientCount === 3) {
-    return userIngredientCount >= 3 && matchCount === 3;
-  } else if (recipeIngredientCount > 0) {
-    return matchCount === recipeIngredientCount && userIngredientCount >= recipeIngredientCount;
+    return userIngredientCount >= 2 && matchCount >= 2;
+  } else if (recipeIngredientCount === 2) {
+    return userIngredientCount >= 1 && matchCount >= 1;
+  } else if (recipeIngredientCount === 1) {
+    return userIngredientCount >=1 && matchCount === 1;
   }
   return false;
 }
@@ -52,7 +54,7 @@ exports.findRecipes = functions.https.onCall(async (data, context) => {
   functions.logger.info("findRecipes 함수 호출됨. 받은 data 객체 전체:", data, {structuredData: true});
   functions.logger.info("함수 로직 실행 시작.");
   if (!db || typeof db.collection !== "function") {
-    /* ... DB 오류 처리 ... */ throw new functions.https.HttpsError("internal", "서버 설정 오류.");
+    throw new functions.https.HttpsError("internal", "서버 설정 오류.");
   }
   functions.logger.info("Firestore DB 인스턴스 유효함 확인.");
 
@@ -60,123 +62,159 @@ exports.findRecipes = functions.https.onCall(async (data, context) => {
   const receivedUserIngredients = data.data.userIngredients;
   if (Array.isArray(receivedUserIngredients)) {
     userIngredients = receivedUserIngredients.map((ing) => String(ing).toLowerCase());
-  } else {
-    functions.logger.warn("받은 userIngredients가 배열이 아닙니다:", receivedUserIngredients);
   }
   const userIngredientCount = userIngredients.length;
   functions.logger.info("최종 userIngredients 값:", userIngredients);
 
-  if (userIngredientCount === 0) {
+  const recipeNameQuery = data.data.recipeNameQuery ? String(data.data.recipeNameQuery).toLowerCase().trim() : null;
+  functions.logger.info("레시피 이름 검색어:", recipeNameQuery);
+
+  if (userIngredientCount === 0 && !recipeNameQuery) {
     return [];
   }
 
-  functions.logger.info("사용자 재료 기반 레시피 검색 시작 (필터링 로직 포함):", userIngredients, {structuredData: true});
-
-  const allMissingIngredientIds = new Set();
-  let recipesWithMissingInfo = [];
+  const finalRecipesOutput = [];
+  const processedRecipeIds = new Set();
+  const allIngredientIdsToFetchAds = new Set();
 
   try {
     functions.logger.info("Firestore 'recipes' 컬렉션 읽기 시도...");
     const recipesSnapshot = await db.collection("recipes").get();
     functions.logger.info("'recipes' 컬렉션 읽기 성공. 문서 개수:", recipesSnapshot.size);
 
-    const potentialMatches = [];
-    recipesSnapshot.forEach((doc) => {
-      const recipeData = doc.data();
-      functions.logger.debug(`Firestore 문서 ${doc.id} 데이터 로드됨:`, recipeData, {structuredData: true});
-      const recipe = {id: doc.id, ...recipeData};
-
-      if (!recipe.ingredients || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0 ||
-          !recipe.ingredientIds || !Array.isArray(recipe.ingredientIds) ||
-          recipe.ingredients.length !== recipe.ingredientIds.length) {
-        functions.logger.warn(`Recipe ${recipe.name} (ID: ${recipe.id}) has missing, invalid, or mismatched ingredients/ingredientIds arrays.`);
-        return;
-      }
-
-      const recipeIngredientNames = recipe.ingredients.map((ing) => String(ing).toLowerCase());
-      const recipeIngredientCount = recipeIngredientNames.length;
-      let matchCount = 0;
-      const recipeIngredientsSet = new Set(recipeIngredientNames);
-      for (const userIng of userIngredients) {
-        if (recipeIngredientsSet.has(userIng)) {
-          matchCount++;
-        }
-      }
-
-      const currentRecipeName = recipe.name || "이름 없음";
-      if (checkRecipeMatch(recipeIngredientCount, userIngredientCount, matchCount)) {
-        functions.logger.info(`레시피 ${currentRecipeName} 필터링 통과 (재료수:${recipeIngredientCount}, 입력수:${userIngredientCount}, 일치수:${matchCount})`);
-        potentialMatches.push({recipe, recipeIngredientIds: recipe.ingredientIds}); // 영어 ID 배열 전달
-      } else {
-        functions.logger.info(`레시피 ${currentRecipeName} 필터링 제외 (재료수:${recipeIngredientCount}, 입력수:${userIngredientCount}, 일치수:${matchCount})`);
-      }
-    });
-
-    // 부족한 재료 계산
-    recipesWithMissingInfo = potentialMatches.map(({recipe, recipeIngredientIds}) => {
-      const missingIngredients = [];
-      let userInputSufficient = true;
-      recipeIngredientIds.forEach((recipeIngId, index) => {
-        // 사용자 입력(한글 소문자)과 레시피의 한글 이름(소문자) 비교
-        const currentRecipeKoreanNameLower = String(recipe.ingredients[index]).toLowerCase();
-        const userHasKoreanIngredient = userIngredients.includes(currentRecipeKoreanNameLower);
-
-        // --- 👇 userHasIngredient 변수 제거 👇 ---
-        if (!userHasKoreanIngredient) { // 한글 이름 기준으로 사용자가 가지고 있는지 확인
-        // --- 👆 userHasIngredient 변수 제거 👆 ---
-          const originalKoreanName = recipe.ingredients[index]; // 한글 이름
-          const englishId = recipe.ingredientIds[index]; // 해당 영어 ID
-          missingIngredients.push({name: originalKoreanName, id: englishId, adLink: null});
-          allMissingIngredientIds.add(englishId); // 광고 조회는 영어 ID로
-          userInputSufficient = false;
+    // 1. 이름 기반 검색
+    if (recipeNameQuery) {
+      functions.logger.info(`이름 검색 실행: "${recipeNameQuery}"`);
+      recipesSnapshot.forEach((doc) => {
+        const recipeData = doc.data();
+        const recipe = {id: doc.id, ...recipeData};
+        const recipeNameLower = String(recipe.name || "").toLowerCase();
+        functions.logger.debug(`이름 비교: 레시피 이름 ("${recipeNameLower}") vs 검색어 ("${recipeNameQuery}")`);
+        if (recipeNameLower.includes(recipeNameQuery)) {
+          if (!processedRecipeIds.has(recipe.id)) {
+            functions.logger.info(`이름 검색 일치: ${recipe.name} (ID: ${recipe.id})`);
+            const allRecipeIngredientsWithAdPlaceholder = [];
+            if (recipe.ingredients && recipe.ingredientIds && recipe.ingredients.length === recipe.ingredientIds.length) {
+              recipe.ingredientIds.forEach((ingId, index) => {
+                allIngredientIdsToFetchAds.add(String(ingId).toLowerCase());
+                allRecipeIngredientsWithAdPlaceholder.push({
+                  name: recipe.ingredients[index],
+                  id: String(ingId).toLowerCase(),
+                  adLink: null,
+                });
+              });
+            }
+            finalRecipesOutput.push({
+              ...recipe,
+              userInputSufficient: false,
+              missingIngredients: allRecipeIngredientsWithAdPlaceholder,
+            });
+            processedRecipeIds.add(recipe.id);
+          }
         }
       });
-      return {...recipe, userInputSufficient, missingIngredients};
-    });
+      functions.logger.info(`이름 검색 후 중간 결과 (finalRecipesOutput) 개수: ${finalRecipesOutput.length}`);
+    }
 
-    // 광고 링크 조회 로직
-    const adLinksMap = new Map();
-    if (allMissingIngredientIds.size > 0) {
-      functions.logger.info("광고 링크 조회할 부족한 재료 ID 목록:", Array.from(allMissingIngredientIds));
+    // 2. 재료 기반 검색
+    functions.logger.info(`재료 기반 검색 진입 직전 userIngredientCount 값: ${userIngredientCount}`);
+    if (userIngredientCount > 0) {
+      functions.logger.info("재료 기반 검색 실행:", userIngredients);
+      recipesSnapshot.forEach((doc) => {
+        if (processedRecipeIds.has(doc.id)) {
+          return;
+        }
+        const recipeData = doc.data();
+        const recipe = {id: doc.id, ...recipeData};
+
+        if (!recipe.ingredients || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0 ||
+            !recipe.ingredientIds || !Array.isArray(recipe.ingredientIds) ||
+            recipe.ingredients.length !== recipe.ingredientIds.length) {
+          functions.logger.warn(`Recipe ${recipe.name} (ID: ${recipe.id}) has missing, invalid, or mismatched ingredients/ingredientIds arrays.`);
+          return;
+        }
+
+        const recipeIngredientNames = recipe.ingredients.map((ing) => String(ing).toLowerCase());
+        const recipeIngredientCount = recipeIngredientNames.length;
+        let matchCount = 0;
+        const recipeIngredientsSet = new Set(recipeIngredientNames);
+        for (const userIng of userIngredients) {
+          if (recipeIngredientsSet.has(userIng)) {
+            matchCount++;
+          }
+        }
+
+        const currentRecipeName = recipe.name || "이름 없음";
+        if (checkRecipeMatch(recipeIngredientCount, userIngredientCount, matchCount)) {
+          functions.logger.info(`재료 검색: 레시피 ${currentRecipeName} 필터링 통과 (재료수:${recipeIngredientCount}, 입력수:${userIngredientCount}, 일치수:${matchCount})`);
+          const currentRecipeMissingIngredients = [];
+          let isSufficient = true;
+          recipe.ingredientIds.forEach((ingId, index) => {
+            const currentRecipeKoreanNameLower = String(recipe.ingredients[index]).toLowerCase();
+            const userHasKoreanIngredient = userIngredients.includes(currentRecipeKoreanNameLower);
+            if (!userHasKoreanIngredient) {
+              allIngredientIdsToFetchAds.add(String(ingId).toLowerCase());
+              currentRecipeMissingIngredients.push({name: recipe.ingredients[index], id: String(ingId).toLowerCase(), adLink: null});
+              isSufficient = false;
+            }
+          });
+          finalRecipesOutput.push({...recipe, userInputSufficient: isSufficient, missingIngredients: currentRecipeMissingIngredients});
+          processedRecipeIds.add(recipe.id);
+        } else {
+          functions.logger.info(`재료 검색: 레시피 ${currentRecipeName} 필터링 제외 (재료수:${recipeIngredientCount}, 입력수:${userIngredientCount}, 일치수:${matchCount})`);
+        }
+      });
+    }
+
+    // 3. 광고 링크 일괄 조회
+    const adLinksMap = new Map(); // adLinksMap 선언 및 초기화
+    if (allIngredientIdsToFetchAds.size > 0) {
+      functions.logger.info("광고 링크 조회할 모든 재료 ID 목록:", Array.from(allIngredientIdsToFetchAds));
       try {
-        const missingIngredientIds = Array.from(allMissingIngredientIds).slice(0, 30);
-        if (missingIngredientIds.length > 0) {
-          const adSnapshot = await db.collection("ingredients_ads").where(admin.firestore.FieldPath.documentId(), "in", missingIngredientIds).get();
+        const idsToFetch = Array.from(allIngredientIdsToFetchAds).slice(0, 30);
+        if (idsToFetch.length > 0) {
+          const adSnapshot = await db.collection("ingredients_ads").where(admin.firestore.FieldPath.documentId(), "in", idsToFetch).get();
           adSnapshot.forEach((doc) => {
-            const adData = doc.data(); if (adData && adData.adLink) {
-              adLinksMap.set(doc.id, adData.adLink);
+            const adData = doc.data();
+            if (adData && adData.adLink) {
+              adLinksMap.set(doc.id, adData.adLink); // Map에 링크 저장
             }
           });
           functions.logger.info("조회된 광고 링크 Map:", adLinksMap);
         }
-        if (allMissingIngredientIds.size > 30) {
-          functions.logger.warn("부족한 재료가 30개를 초과하여 일부 광고 링크만 조회했습니다.");
+        if (allIngredientIdsToFetchAds.size > 30) {
+          functions.logger.warn("광고 링크 조회 대상 재료 ID가 30개를 초과하여 일부만 조회했습니다.");
         }
       } catch (adError) {
         functions.logger.error("광고 링크 조회 중 오류 발생:", adError);
       }
     }
 
-    // 광고 링크 매핑
-    const finalRecipes = recipesWithMissingInfo.map((recipe) => {
-      if (!recipe.userInputSufficient) {
-        recipe.missingIngredients = recipe.missingIngredients.map((missingIng) => {
-          const lowerCaseName = missingIng.id; // 이미 영어 ID를 가지고 있음
-          return {...missingIng, adLink: adLinksMap.get(lowerCaseName) || null};
+    // 최종 레시피 목록에 광고 링크 적용
+    // --- 👇 .map() 콜백에서 return 추가 및 adLinksMap 사용 👇 ---
+    const recipesWithAds = finalRecipesOutput.map((recipe) => {
+      if (recipe.missingIngredients && recipe.missingIngredients.length > 0) {
+        const updatedMissingIngredients = recipe.missingIngredients.map((missingIng) => {
+          return { // 각 missingIngredient 객체를 반환
+            ...missingIng,
+            adLink: adLinksMap.get(missingIng.id) || null, // adLinksMap 사용
+          };
         });
+        return {...recipe, missingIngredients: updatedMissingIngredients}; // 수정된 recipe 객체를 반환
       }
-      return recipe;
+      return recipe; // 변경 없는 recipe 객체 반환
     });
+    // --- 👆 .map() 콜백에서 return 추가 및 adLinksMap 사용 👆 ---
 
     // 최종 정렬
-    finalRecipes.sort((a, b) => {
+    recipesWithAds.sort((a, b) => {
       if (a.userInputSufficient && !b.userInputSufficient) return -1;
       if (!a.userInputSufficient && b.userInputSufficient) return 1;
-      return a.name.localeCompare(b.name);
+      return (a.name || "").localeCompare(b.name || ""); // sort 콜백에서 값 반환
     });
 
-    functions.logger.info("최종 레시피 목록 반환 직전 데이터:", finalRecipes);
-    return finalRecipes; // 최종 결과 반환
+    functions.logger.info("최종 레시피 목록 반환 직전 데이터:", recipesWithAds);
+    return recipesWithAds;
   } catch (error) {
     functions.logger.error("메인 로직 실행 중 오류 발생:", error, {structuredData: true});
     throw new functions.https.HttpsError("internal", "레시피 검색 중 오류가 발생했습니다.");
