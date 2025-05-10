@@ -1,38 +1,286 @@
-.App {
-  text-align: center;
+/* src/App.css (UI 개선 스타일) */
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif; /* 좀 더 부드러운 폰트 (Pretendard는 예시, 시스템 폰트 우선) */
+  margin: 0;
+  background-color: #f7f9fc; /* 밝고 부드러운 배경색 */
+  color: #333;
+  line-height: 1.6;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.app-container {
+  max-width: 768px; /* 콘텐츠 최대 너비 조정 */
+  margin: 0 auto; /* 중앙 정렬 */
+  padding: 20px;
   display: flex;
   flex-direction: column;
+  min-height: 100vh; /* 최소 화면 높이 */
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.app-header h1 {
+  font-size: 2.5em; /* 제목 크기 조정 */
+  color: #2c3e50; /* 제목 색상 */
+  margin-bottom: 8px;
+}
+
+.app-header p {
+  font-size: 1.1em;
+  color: #555;
+}
+
+.search-section {
+  background-color: #ffffff;
+  padding: 25px;
+  border-radius: 12px; /* 부드러운 모서리 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* 은은한 그림자 */
+  margin-bottom: 30px;
+}
+
+.search-input-group {
+  margin-bottom: 20px;
+}
+
+.recipe-name-input,
+.ingredient-form input[type="text"] {
+  width: calc(100% - 24px); /* 패딩 고려한 너비 */
+  padding: 12px;
+  border: 1px solid #d1d5db; /* 테두리 색상 변경 */
+  border-radius: 8px; /* 모서리 둥글게 */
+  font-size: 1em;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.recipe-name-input:focus,
+.ingredient-form input[type="text"]:focus {
+  border-color: #4a90e2; /* 포커스 시 테두리 색상 */
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2); /* 포커스 시 그림자 */
+  outline: none;
+}
+
+.ingredient-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+}
+
+.ingredient-form input[type="text"] {
+  flex-grow: 1; /* 입력 필드가 남은 공간 차지 */
+}
+
+.ingredient-form button,
+.search-button {
+  padding: 12px 18px;
+  background-color: #3498db; /* 주 색상 (파란색 계열) */
   color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.App-link {
-  color: #61dafb;
+.ingredient-form button:hover,
+.search-button:hover {
+  background-color: #2980b9; /* 호버 시 약간 어둡게 */
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.ingredient-form button:disabled,
+.search-button:disabled {
+  background-color: #bdc3c7; /* 비활성화 시 색상 */
+  cursor: not-allowed;
+}
+
+.search-button {
+  width: 100%; /* 버튼 너비 꽉 채움 */
+  font-size: 1.1em;
+  margin-top: 10px; /* 재료 입력 폼과의 간격 */
+}
+
+.ingredient-tags {
+  margin-top: 15px;
+  margin-bottom: 10px; /* 검색 버튼과의 간격 */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start; /* 왼쪽 정렬 */
+}
+
+.tag {
+  background-color: #e9edf0; /* 태그 배경색 */
+  color: #34495e; /* 태그 글자색 */
+  padding: 6px 12px;
+  border-radius: 16px; /* 더 둥근 태그 */
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.tag button {
+  background: none;
+  border: none;
+  color: #95a5a6; /* 삭제 버튼 색상 */
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 1.2em; /* 아이콘 크기 느낌 */
+  padding: 0;
+  line-height: 1;
+}
+.tag button:hover {
+  color: #e74c3c; /* 삭제 버튼 호버 시 색상 */
+}
+
+.results-section {
+  flex-grow: 1; /* 남은 공간 채우도록 */
+}
+
+.loading-message,
+.error-message {
+  text-align: center;
+  font-size: 1.1em;
+  padding: 30px 20px;
+  color: #555;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.error-message {
+  color: #e74c3c; /* 에러 메시지 색상 */
+  border: 1px solid #f5c6cb;
+  background-color: #f8d7da;
+}
+
+/* RecipeList 및 RecipeCard 스타일은 기존 것 유지 또는 필요시 추가 */
+.recipe-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px; /* 카드 간 간격 */
+}
+
+.recipe-card {
+  border: 1px solid #e0e0e0; /* 카드 테두리 */
+  border-radius: 12px; /* 카드 모서리 */
+  padding: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.recipe-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.recipe-card img {
+  width: 100%;
+  max-height: 220px; /* 이미지 최대 높이 조정 */
+  object-fit: cover;
+  border-radius: 8px; /* 이미지 모서리 */
+  margin-bottom: 15px;
+}
+
+.recipe-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #3498db; /* 레시피 이름 색상 */
+  font-size: 1.4em;
+}
+
+.recipe-card p {
+  font-size: 0.95em;
+  margin-bottom: 12px;
+  color: #555;
+}
+
+.recipe-card ul, .recipe-card ol {
+  padding-left: 20px;
+  font-size: 0.9em;
+  margin-bottom: 12px;
+  color: #444;
+}
+.recipe-card li {
+    margin-bottom: 5px;
+}
+
+.expand-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 10px;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.expand-button:hover {
+  background-color: #2980b9;
+}
+
+.missing-ingredients {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #fff9e6; /* 부족한 재료 배경색 */
+  border: 1px solid #ffe082; /* 부족한 재료 테두리 */
+  border-radius: 8px;
+}
+
+.missing-ingredients strong {
+  color: #ff8f00; /* 부족한 재료 강조 색상 */
+  font-weight: 600;
+}
+
+.missing-ingredients ul {
+  list-style-type: none; /* 기본 리스트 스타일 제거 */
+  padding-left: 0; /* 왼쪽 패딩 제거 */
+  margin-top: 8px;
+}
+.missing-ingredients li {
+    margin-bottom: 6px;
+}
+.missing-ingredients a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+}
+.missing-ingredients a:hover {
+    text-decoration: underline;
+}
+
+/* 모바일 반응형 추가 */
+@media (max-width: 600px) {
+  .app-container {
+    padding: 15px;
   }
-  to {
-    transform: rotate(360deg);
+  .app-header h1 {
+    font-size: 2em;
+  }
+  .search-section {
+    padding: 20px;
+  }
+  .ingredient-form {
+    flex-direction: column; /* 모바일에서는 재료 입력 필드와 버튼을 세로로 */
+    align-items: stretch; /* 전체 너비 사용 */
+  }
+  .ingredient-form input[type="text"] {
+    margin-bottom: 10px; /* 버튼과의 간격 */
+    width: calc(100% - 24px); /* 패딩 고려 */
+  }
+  .ingredient-form button {
+    width: 100%; /* 버튼 너비 꽉 채움 */
+  }
+  .recipe-name-input {
+    width: calc(100% - 24px); /* 패딩 고려 */
   }
 }
